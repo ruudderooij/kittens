@@ -31,13 +31,9 @@ class InstrumentedHandler(web.RequestHandler):
     duration_metric = prometheus_client.Summary('http_request_duration_microseconds', 'The HTTP request latencies in microseconds.', ['handler'])
     status_metric = prometheus_client.Counter('http_requests_total', 'Total number of HTTP requests made.', ['code'])
 
-    def handler(self):
-        # TODO: this is super hacky.
-        return str(self.__class__).split("'")[1].split('.')[1]
-
     def on_finish(self):
         super(InstrumentedHandler, self).on_finish()
-        self.duration_metric.labels(self.handler()).observe(self.request.request_time() * 1e6)
+        self.duration_metric.labels(self.__class__.__name__).observe(self.request.request_time() * 1e6)
         self.status_metric.labels(self.get_status()).inc()
 
 # -----------------------------------------------------------------------------
