@@ -1,5 +1,6 @@
 from collections import namedtuple
 from concurrent import futures
+import ipaddress
 import json
 import random
 import time
@@ -29,12 +30,13 @@ class KittenFactory(object):
 
 class InstrumentedHandler(web.RequestHandler):
     duration_metric = prometheus_client.Summary('http_request_duration_microseconds', 'The HTTP request latencies in microseconds.', ['handler'])
-    status_metric = prometheus_client.Counter('http_requests_total', 'Total number of HTTP requests made.', ['code'])
+    total_metric = prometheus_client.Counter('http_requests_total', 'Total number of HTTP requests made.', ['code', 'handler', 'method'])
 
     def on_finish(self):
         super(InstrumentedHandler, self).on_finish()
-        self.duration_metric.labels(self.__class__.__name__).observe(self.request.request_time() * 1e6)
-        self.status_metric.labels(self.get_status()).inc()
+        handler = type(self).__name__
+        self.duration_metric.labels(handler).observe(self.request.request_time() * 1e6)
+        self.total_metric.labels(self.get_status(), handler, self.request.method.lower()).inc()
 
 # -----------------------------------------------------------------------------
 
@@ -54,9 +56,13 @@ class MainHandler(InstrumentedHandler):
 
 class MetricsHandler(InstrumentedHandler):
     def get(self):
+        if not ipaddress.ip_address(self.request.remote_ip).is_private:
+            self.set_status(403)
+            return
         self.set_header("Content-Type", "text/plain")
-        self.write('# REMOTE IP: {}\n\n'.format(self.request.remote_ip))
         self.write(prometheus_client.generate_latest())
+
+# -----------------------------------------------------------------------------
 
 application = web.Application([
         (r"/", MainHandler, dict(kitten_factory=KittenFactory())),
