@@ -1,6 +1,7 @@
 from collections import namedtuple
 from concurrent import futures
 import ipaddress
+import logging
 import json
 import random
 import time
@@ -59,21 +60,21 @@ class MetricsHandler(InstrumentedHandler):
         if not ipaddress.ip_address(self.request.remote_ip).is_private:
             self.set_status(403)
             return
-        self.set_header("Content-Type", "text/plain")
+        self.set_header('Content-Type', prometheus_client.CONTENT_TYPE_LATEST)
         self.write(prometheus_client.generate_latest())
 
 # -----------------------------------------------------------------------------
 
 application = web.Application([
-        (r"/", MainHandler, dict(kitten_factory=KittenFactory())),
-        (r"/metrics", MetricsHandler),
+        (r'/', MainHandler, dict(kitten_factory=KittenFactory())),
+        (r'/metrics', MetricsHandler),
     ],
-    static_path="static",
+    static_path='static',
     static_handler_class=InstrumentedStaticHandler,
-    template_path="templates")
+    template_path='templates')
 
-if __name__ == "__main__":
-    prometheus_client.start_http_server(8000)
+if __name__ == '__main__':
+    logging.getLogger('tornado.access').setLevel(logging.INFO)
     server = httpserver.HTTPServer(application, xheaders=True)
     server.listen(8888)
     ioloop.IOLoop.current().start()

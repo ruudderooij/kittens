@@ -1,2 +1,2 @@
-tornado==4.2.1
+tornado
 prometheus_client
